@@ -118,7 +118,7 @@ function Home() {
       setStreak(newStreak);
 
       try {
-        await fetch("http://localhost:5000/submit-score", {
+        await fetch("https://logic-looper-backend.onrender.com/submit-score", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
