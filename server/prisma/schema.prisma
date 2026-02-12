@@ -1,0 +1,31 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  score     Int
+  streak    Int      @default(0)
+  timeTaken Int?
+  date      String?
+  createdAt DateTime @default(now())
+
+  results Result[] // 👈 THIS IS REQUIRED
+}
+
+model Result {
+  id        String   @id @default(uuid())
+  userId    String
+  score     Int
+  timeTaken Int
+  date      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}

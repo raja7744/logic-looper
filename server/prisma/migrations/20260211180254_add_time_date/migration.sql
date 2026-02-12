@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "Result" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "date" TEXT,
+ADD COLUMN     "timeTaken" INTEGER,
+ALTER COLUMN "score" DROP DEFAULT;
