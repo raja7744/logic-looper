@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import dayjs from "dayjs";
 import { getDailySeed } from "../utils/seed";
 import { generateDailyPuzzle } from "../puzzles";
+import { saveData, getData } from "../services/indexedDB";
 
 import { auth, provider } from "../services/firebase";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
@@ -11,16 +12,21 @@ function Home() {
   const seed = getDailySeed();
   const today = dayjs().format("YYYY-MM-DD");
 
-  // ------------------------
-  // USER AUTH STATE
-  // ------------------------
   const [user, setUser] = useState(null);
+  const [streak, setStreak] = useState(0);
+  const [score, setScore] = useState(0);
+  const [completed, setCompleted] = useState(false);
+  const [result, setResult] = useState(null);
+  const [userAnswer, setUserAnswer] = useState("");
+  const [time, setTime] = useState(0);
 
+  const puzzle = generateDailyPuzzle(seed, streak) || {};
+
+  // ---------------- AUTH ----------------
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -28,7 +34,7 @@ function Home() {
     try {
       await signInWithPopup(auth, provider);
     } catch (error) {
-      console.error("Login error:", error);
+      console.error(error);
     }
   };
 
@@ -36,47 +42,25 @@ function Home() {
     await signOut(auth);
   };
 
-  // ------------------------
-  // STREAK
-  // ------------------------
-  const [streak, setStreak] = useState(() => {
-    const lastPlayed = localStorage.getItem("last-played");
-    const savedStreak = Number(localStorage.getItem("streak")) || 0;
+  // ---------------- LOAD INDEXEDDB ----------------
+  useEffect(() => {
+    async function loadGameData() {
+      const storedScore = await getData("score");
+      const storedStreak = await getData("streak");
+      const storedCompleted = await getData("completed-" + seed);
 
-    if (!lastPlayed) return savedStreak;
-
-    const diff = dayjs(today).diff(dayjs(lastPlayed), "day");
-
-    if (diff > 1) {
-      localStorage.setItem("streak", "0");
-      return 0;
+      if (storedScore) setScore(storedScore);
+      if (storedStreak) setStreak(storedStreak);
+      if (storedCompleted) {
+        setCompleted(true);
+        setResult("correct");
+      }
     }
 
-    return savedStreak;
-  });
+    loadGameData();
+  }, [seed]);
 
-  // ------------------------
-  // PUZZLE
-  // ------------------------
-  const puzzle = generateDailyPuzzle(seed, streak) || {};
-
-  const [userAnswer, setUserAnswer] = useState("");
-  const [time, setTime] = useState(0);
-  const [completed, setCompleted] = useState(
-    localStorage.getItem("puzzle-completed-" + seed) === "true"
-  );
-  const [result, setResult] = useState(
-    localStorage.getItem("puzzle-completed-" + seed) === "true"
-      ? "correct"
-      : null
-  );
-  const [score, setScore] = useState(() => {
-    return Number(localStorage.getItem("score")) || 0;
-  });
-
-  // ------------------------
-  // TIMER
-  // ------------------------
+  // ---------------- TIMER ----------------
   useEffect(() => {
     if (completed) return;
 
@@ -87,35 +71,24 @@ function Home() {
     return () => clearInterval(interval);
   }, [completed]);
 
-  // ------------------------
-  // HANDLE SUBMIT
-  // ------------------------
+  // ---------------- SUBMIT ----------------
   const handleSubmit = async () => {
-    if (completed || !user) return;
+    if (!user || completed) return;
 
-    if (userAnswer === puzzle.answer) {
+    if (userAnswer === String(puzzle.answer)) {
       setResult("correct");
       setCompleted(true);
 
       const pointsEarned = Math.max(100 - time, 10);
       const newScore = score + pointsEarned;
+      const newStreak = streak + 1;
 
-      localStorage.setItem("score", newScore);
       setScore(newScore);
-      localStorage.setItem("puzzle-completed-" + seed, "true");
-
-      const lastPlayed = localStorage.getItem("last-played");
-      const savedStreak = parseInt(localStorage.getItem("streak")) || 0;
-
-      let newStreak = 1;
-      if (lastPlayed) {
-        const diff = dayjs(today).diff(dayjs(lastPlayed), "day");
-        if (diff === 1) newStreak = savedStreak + 1;
-      }
-
-      localStorage.setItem("streak", newStreak);
-      localStorage.setItem("last-played", today);
       setStreak(newStreak);
+
+      await saveData("score", newScore);
+      await saveData("streak", newStreak);
+      await saveData("completed-" + seed, true);
 
       try {
         await fetch("https://logic-looper-backend.onrender.com/submit-score", {
@@ -137,9 +110,6 @@ function Home() {
     }
   };
 
-  // ------------------------
-  // RENDER QUESTION
-  // ------------------------
   const renderQuestion = () => {
     if (!Array.isArray(puzzle.question)) return null;
 
@@ -156,7 +126,6 @@ function Home() {
 
         <h1 className="text-4xl font-bold mb-2">Logic Looper</h1>
 
-        {/* LOGIN SECTION */}
         {!user ? (
           <button
             onClick={handleLogin}
@@ -200,9 +169,9 @@ function Home() {
         </div>
 
         <input
-          type="number"
+          type="text"
           value={userAnswer}
-          disabled={completed || !user}
+          disabled={!user || completed}
           onChange={(e) => setUserAnswer(e.target.value)}
           className="w-full p-3 text-black rounded mb-4 disabled:opacity-50"
           placeholder="Enter your answer"
@@ -210,7 +179,7 @@ function Home() {
 
         <button
           onClick={handleSubmit}
-          disabled={completed || !user}
+          disabled={!user || completed}
           className="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded transition disabled:opacity-50"
         >
           Submit
