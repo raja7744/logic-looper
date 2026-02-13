@@ -5,7 +5,7 @@ function Leaderboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:5000/leaderboard")
+    fetch("https://logic-looper-backend.onrender.com/leaderboard")
       .then((res) => res.json())
       .then((data) => {
         setUsers(data);
