@@ -11,7 +11,7 @@ export function generateMathPuzzle(seed) {
     `${c} + ${a}`
   ];
 
-  const answer = a + b + c;
+  const answer = (a + b) + (b + c) + (c + a);
 
   return {
     question,

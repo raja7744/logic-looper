@@ -5,6 +5,7 @@ import { getDailySeed } from "../utils/seed";
 import { generateDailyPuzzle } from "../puzzles";
 import { saveData, getData } from "../services/indexedDB";
 
+
 import { auth, provider } from "../services/firebase";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 
@@ -44,21 +45,23 @@ function Home() {
 
   // ---------------- LOAD INDEXEDDB ----------------
   useEffect(() => {
-    async function loadGameData() {
-      const storedScore = await getData("score");
-      const storedStreak = await getData("streak");
-      const storedCompleted = await getData("completed-" + seed);
+  async function loadGameData() {
+    const storedScore = await getData("score");
+    const storedStreak = await getData("streak");
+    const storedCompleted = await getData("completed-" + seed);
 
-      if (storedScore) setScore(storedScore);
-      if (storedStreak) setStreak(storedStreak);
-      if (storedCompleted) {
-        setCompleted(true);
-        setResult("correct");
-      }
+    if (storedScore !== undefined) setScore(storedScore);
+    if (storedStreak !== undefined) setStreak(storedStreak);
+
+    if (storedCompleted) {
+      setCompleted(true);
+      setResult("correct");
     }
+  }
 
-    loadGameData();
-  }, [seed]);
+  loadGameData();
+}, [seed]);
+
 
   // ---------------- TIMER ----------------
   useEffect(() => {
@@ -73,52 +76,64 @@ function Home() {
 
   // ---------------- SUBMIT ----------------
   const handleSubmit = async () => {
-    if (!user || completed) return;
+  if (!user || completed) return;
 
-    if (userAnswer === String(puzzle.answer)) {
-      setResult("correct");
-      setCompleted(true);
+  if (userAnswer === String(puzzle.answer)) {
+    setResult("correct");
+    setCompleted(true);
 
-      const pointsEarned = Math.max(100 - time, 10);
-      const newScore = score + pointsEarned;
-      const newStreak = streak + 1;
+    const pointsEarned = Math.max(100 - time, 10);
+    const newScore = score + pointsEarned;
+    const newStreak = streak + 1;
 
-      setScore(newScore);
-      setStreak(newStreak);
+    setScore(newScore);
+    setStreak(newStreak);
 
-      await saveData("score", newScore);
-      await saveData("streak", newStreak);
-      await saveData("completed-" + seed, true);
+    // ✅ Save structured data in IndexedDB
+    await saveData(`result_${today}`, {
+      email: user.email,
+      score: newScore,
+      timeTaken: time,
+      date: today,
+      synced: false
+    });
 
-      try {
-        await fetch("https://logic-looper-backend.onrender.com/submit-score", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: user.email,
-            score: newScore,
-            timeTaken: time,
-            date: today,
-          }),
-        });
-      } catch (error) {
-        console.error("Backend error:", error);
-      }
+    await saveData("score", newScore);
+    await saveData("streak", newStreak);
+    await saveData("completed-" + seed, true);
 
-    } else {
-      setResult("wrong");
+    // ✅ Send to backend
+    try {
+      await fetch("https://logic-looper-backend.onrender.com/submit-score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user.email,
+          score: newScore,
+          timeTaken: time,
+          date: today,
+        }),
+      });
+
+      // If successful → mark as synced
+      await saveData(`result_${today}`, {
+        email: user.email,
+        score: newScore,
+        timeTaken: time,
+        date: today,
+        synced: true
+      });
+
+    } catch (error) {
+      console.error("Backend error:", error);
     }
-  };
 
-  const renderQuestion = () => {
-    if (!Array.isArray(puzzle.question)) return null;
+  } else {
+    setResult("wrong");
+  }
+};
+// ---------------- RENDER QUESTION ----------------
 
-    return puzzle.question.map((item, index) => (
-      <span key={index}>
-        {Array.isArray(item) ? item.join(" ") : String(item)}
-      </span>
-    ));
-  };
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
@@ -163,10 +178,14 @@ function Home() {
           ⏱ Time: {time}s
         </p>
 
-        <div className="mb-6 text-xl flex justify-center gap-3 font-semibold">
-          {renderQuestion()}
-          <span>?</span>
-        </div>
+        <div className="mb-6 text-xl font-semibold space-y-2">
+  {Array.isArray(puzzle.question) &&
+    puzzle.question.map((line, index) => (
+      <div key={index}>{line}</div>
+    ))}
+  <div className="mt-2">?</div>
+</div>
+
 
         <input
           type="text"
