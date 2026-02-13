@@ -13,6 +13,9 @@ export function generateMathPuzzle(seed) {
 
   const answer = (a + b) + (b + c) + (c + a);
 
+  console.log("Math puzzle values:", a, b, c);
+console.log("Math answer:", answer);
+
   return {
     question,
     answer,

@@ -78,7 +78,15 @@ function Home() {
   const handleSubmit = async () => {
   if (!user || completed) return;
 
-  if (userAnswer === String(puzzle.answer)) {
+  let isCorrect = false;
+
+  if (puzzle.type === "binary") {
+    isCorrect = userAnswer.trim() === String(puzzle.answer);
+  } else {
+    isCorrect = Number(userAnswer) === Number(puzzle.answer);
+  }
+
+  if (isCorrect) {
     setResult("correct");
     setCompleted(true);
 
@@ -89,7 +97,6 @@ function Home() {
     setScore(newScore);
     setStreak(newStreak);
 
-    // ✅ Save structured data in IndexedDB
     await saveData(`result_${today}`, {
       email: user.email,
       score: newScore,
@@ -102,7 +109,6 @@ function Home() {
     await saveData("streak", newStreak);
     await saveData("completed-" + seed, true);
 
-    // ✅ Send to backend
     try {
       await fetch("https://logic-looper-backend.onrender.com/submit-score", {
         method: "POST",
@@ -115,7 +121,6 @@ function Home() {
         }),
       });
 
-      // If successful → mark as synced
       await saveData(`result_${today}`, {
         email: user.email,
         score: newScore,
@@ -132,6 +137,7 @@ function Home() {
     setResult("wrong");
   }
 };
+
 // ---------------- RENDER QUESTION ----------------
 
 
