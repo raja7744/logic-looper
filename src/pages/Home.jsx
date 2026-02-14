@@ -21,6 +21,8 @@ function Home() {
   const [userAnswer, setUserAnswer] = useState("");
   const [time, setTime] = useState(0);
   const [completionHistory, setCompletionHistory] = useState({});
+  const [hintUsed, setHintUsed] = useState(false);
+  const [showHint, setShowHint] = useState(false);
 
   const puzzle = generateDailyPuzzle(seed, streak) || {};
 
@@ -44,7 +46,7 @@ function Home() {
     await signOut(auth);
   };
 
-  // ---------------- STREAK CALCULATOR ----------------
+  // ---------------- STREAK CALC ----------------
   function calculateStreak(history) {
     let count = 0;
     let day = dayjs();
@@ -57,21 +59,23 @@ function Home() {
     return count;
   }
 
-  // ---------------- LOAD GAME DATA ----------------
+  // ---------------- LOAD DATA ----------------
   useEffect(() => {
     async function loadGameData() {
       const lastPlayedDate = await getData("lastPlayedDate");
       const storedScore = await getData("score");
       const storedHistory = (await getData("completionHistory")) || {};
       const storedCompleted = await getData("completed-" + seed);
+      const storedHint = await getData("hintUsed-" + seed);
 
       setCompletionHistory(storedHistory);
 
-      // Daily reset logic
       if (lastPlayedDate !== today) {
         setCompleted(false);
         setResult(null);
         setTime(0);
+        setHintUsed(false);
+        setShowHint(false);
         await saveData("lastPlayedDate", today);
       }
 
@@ -84,6 +88,10 @@ function Home() {
       if (storedCompleted && lastPlayedDate === today) {
         setCompleted(true);
         setResult("correct");
+      }
+
+      if (storedHint) {
+        setHintUsed(true);
       }
     }
 
@@ -101,36 +109,64 @@ function Home() {
     return () => clearInterval(interval);
   }, [completed]);
 
+  // ---------------- HINT ----------------
+  const getHint = () => {
+    switch (puzzle.type) {
+      case "math":
+        return "Add all expressions carefully.";
+      case "sequence":
+        return "Look at the step difference.";
+      case "binary":
+        return "Convert decimal to binary.";
+      case "grid":
+        return "Observe the number pattern.";
+      case "reverse":
+        return "Reverse the digits.";
+      default:
+        return "Think logically.";
+    }
+  };
+
+  const handleHint = async () => {
+    if (hintUsed) return;
+
+    setHintUsed(true);
+    setShowHint(true);
+    await saveData("hintUsed-" + seed, true);
+
+    const reducedScore = Math.max(score - 5, 0);
+    setScore(reducedScore);
+    await saveData("score", reducedScore);
+  };
+
   // ---------------- SUBMIT ----------------
   const handleSubmit = async () => {
     if (!user || completed) return;
 
-    let isCorrect = false;
-
-    if (puzzle.type === "binary") {
-      isCorrect = userAnswer.trim() === String(puzzle.answer);
-    } else {
-      isCorrect = Number(userAnswer) === Number(puzzle.answer);
-    }
+    let isCorrect =
+      puzzle.type === "binary"
+        ? userAnswer.trim() === String(puzzle.answer)
+        : Number(userAnswer) === Number(puzzle.answer);
 
     if (!isCorrect) {
       setResult("wrong");
       return;
     }
 
-    // Correct answer
     setResult("correct");
     setCompleted(true);
 
     const difficultyMultiplier =
-  puzzle.difficulty === "easy" ? 1 :
-  puzzle.difficulty === "medium" ? 1.5 :
-  2;
+      puzzle.difficulty === "easy"
+        ? 1
+        : puzzle.difficulty === "medium"
+        ? 1.5
+        : 2;
 
-const pointsEarned = Math.max(
-  Math.floor((100 - time) * difficultyMultiplier),
-  10
-);
+    const pointsEarned = Math.max(
+      Math.floor((100 - time) * difficultyMultiplier),
+      10
+    );
 
     const newScore = score + pointsEarned;
 
@@ -139,7 +175,6 @@ const pointsEarned = Math.max(
     await saveData("completed-" + seed, true);
     await saveData("lastPlayedDate", today);
 
-    // Update completion history
     const history = (await getData("completionHistory")) || {};
     history[today] = true;
 
@@ -150,7 +185,6 @@ const pointsEarned = Math.max(
     setStreak(updatedStreak);
     await saveData("streak", updatedStreak);
 
-    // Backend submit
     try {
       await fetch("https://logic-looper-backend.onrender.com/submit-score", {
         method: "POST",
@@ -195,21 +229,10 @@ const pointsEarned = Math.max(
           </>
         )}
 
-        <p className="mb-2 text-gray-400">
-          🧩 Type: {puzzle.type || "Unknown"}
-        </p>
-
-        <p className="mb-2 text-orange-400">
-          🔥 Streak: {streak}
-        </p>
-
-        <p className="mb-2 text-green-400">
-          ⭐ Score: {score}
-        </p>
-
-        <p className="mb-4 text-blue-400">
-          ⏱ Time: {time}s
-        </p>
+        <p className="mb-2 text-gray-400">🧩 Type: {puzzle.type}</p>
+        <p className="mb-2 text-orange-400">🔥 Streak: {streak}</p>
+        <p className="mb-2 text-green-400">⭐ Score: {score}</p>
+        <p className="mb-4 text-blue-400">⏱ Time: {time}s</p>
 
         {/* HEATMAP */}
         <div className="grid grid-cols-7 gap-1 justify-center mb-4">
@@ -230,6 +253,19 @@ const pointsEarned = Math.max(
             ))}
           <div className="mt-2">?</div>
         </div>
+
+        {/* HINT BUTTON */}
+        <button
+          onClick={handleHint}
+          disabled={hintUsed}
+          className="w-full bg-yellow-500 hover:bg-yellow-600 p-2 rounded mb-3 disabled:opacity-50"
+        >
+          {hintUsed ? "Hint Used" : "Get Hint"}
+        </button>
+
+        {showHint && (
+          <p className="text-yellow-400 mb-3">{getHint()}</p>
+        )}
 
         <input
           type="text"
