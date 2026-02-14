@@ -59,7 +59,7 @@ function Home() {
     return count;
   }
 
-  // ---------------- LOAD DATA ----------------
+  // ---------------- LOAD GAME DATA ----------------
   useEffect(() => {
     async function loadGameData() {
       const lastPlayedDate = await getData("lastPlayedDate");
@@ -70,6 +70,7 @@ function Home() {
 
       setCompletionHistory(storedHistory);
 
+      // Daily reset
       if (lastPlayedDate !== today) {
         setCompleted(false);
         setResult(null);
@@ -92,6 +93,7 @@ function Home() {
 
       if (storedHint) {
         setHintUsed(true);
+        setShowHint(true);
       }
     }
 
@@ -143,7 +145,7 @@ function Home() {
   const handleSubmit = async () => {
     if (!user || completed) return;
 
-    let isCorrect =
+    const isCorrect =
       puzzle.type === "binary"
         ? userAnswer.trim() === String(puzzle.answer)
         : Number(userAnswer) === Number(puzzle.answer);
@@ -203,15 +205,19 @@ function Home() {
 
   // ---------------- UI ----------------
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
-      <div className="text-center w-[350px]">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center px-4">
+  <div className="w-full max-w-md bg-gray-850 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-center text-white animate-fadeIn">
 
-        <h1 className="text-4xl font-bold mb-2">Logic Looper</h1>
+
+        <h1 className="text-3xl sm:text-4xl font-bold mb-3 tracking-wide">
+  Logic Looper
+</h1>
+
 
         {!user ? (
           <button
             onClick={handleLogin}
-            className="mb-4 w-full bg-red-600 hover:bg-red-700 p-3 rounded"
+            className="mb-4 w-full bg-red-600 hover:bg-red-700 hover:scale-105 transition transform duration-200 p-3 rounded"
           >
             Sign in with Google
           </button>
@@ -229,42 +235,64 @@ function Home() {
           </>
         )}
 
-        <p className="mb-2 text-gray-400">🧩 Type: {puzzle.type}</p>
-        <p className="mb-2 text-orange-400">🔥 Streak: {streak}</p>
-        <p className="mb-2 text-green-400">⭐ Score: {score}</p>
-        <p className="mb-4 text-blue-400">⏱ Time: {time}s</p>
+        <div className="grid grid-cols-2 gap-3 mb-4 text-sm sm:text-base">
+  <div className="bg-gray-800 p-3 rounded-xl">
+    🔥 Streak
+    <div className="text-orange-400 font-bold">{streak}</div>
+  </div>
+
+  <div className="bg-gray-800 p-3 rounded-xl">
+    ⭐ Score
+    <div className="text-green-400 font-bold">{score}</div>
+  </div>
+
+  <div className="bg-gray-800 p-3 rounded-xl">
+    ⏱ Time
+    <div className="text-blue-400 font-bold">{time}s</div>
+  </div>
+
+  <div className="bg-gray-800 p-3 rounded-xl">
+    🧩 Type
+    <div className="text-gray-300 font-bold capitalize">{puzzle.type}</div>
+  </div>
+</div>
+
 
         {/* HEATMAP */}
-        <div className="grid grid-cols-7 gap-1 justify-center mb-4">
-          {Object.keys(completionHistory)
-            .slice(-21)
-            .map((date) => (
-              <div
-                key={date}
-                className="w-4 h-4 rounded bg-green-500"
-              />
-            ))}
-        </div>
+        <div className="grid grid-cols-7 gap-1 justify-center mb-6">
+  {Object.keys(completionHistory)
+    .slice(-21)
+    .map((date) => (
+      <div
+        key={date}
+        className="w-4 h-4 rounded-sm bg-green-500 hover:scale-110 transition"
+      />
+    ))}
+</div>
 
-        <div className="mb-6 text-xl font-semibold space-y-2">
-          {Array.isArray(puzzle.question) &&
-            puzzle.question.map((line, index) => (
-              <div key={index}>{line}</div>
-            ))}
-          <div className="mt-2">?</div>
-        </div>
 
-        {/* HINT BUTTON */}
+        <div className="mb-6 text-2xl sm:text-3xl font-bold bg-gray-800 p-6 rounded-2xl shadow-inner">
+  {Array.isArray(puzzle.question) &&
+    puzzle.question.map((line, index) => (
+      <div key={index}>{line}</div>
+    ))}
+  <div className="mt-2 text-gray-400">?</div>
+</div>
+
+
+        {/* HINT */}
         <button
           onClick={handleHint}
           disabled={hintUsed}
-          className="w-full bg-yellow-500 hover:bg-yellow-600 p-2 rounded mb-3 disabled:opacity-50"
+          className="w-full bg-yellow-500 hover:bg-yellow-600 hover:scale-105 transition transform duration-200 p-2 rounded mb-3 disabled:opacity-50"
         >
           {hintUsed ? "Hint Used" : "Get Hint"}
         </button>
 
         {showHint && (
-          <p className="text-yellow-400 mb-3">{getHint()}</p>
+          <p className="text-yellow-400 mb-3 animate-fadeIn">
+            {getHint()}
+          </p>
         )}
 
         <input
@@ -272,32 +300,34 @@ function Home() {
           value={userAnswer}
           disabled={!user || completed}
           onChange={(e) => setUserAnswer(e.target.value)}
-          className="w-full p-3 text-black rounded mb-4 disabled:opacity-50"
+          className="w-full p-3 rounded-xl text-black mb-4 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
           placeholder="Enter your answer"
         />
 
         <button
           onClick={handleSubmit}
           disabled={!user || completed}
-          className="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded transition disabled:opacity-50"
+          className="w-full bg-blue-600 hover:bg-blue-700 hover:scale-105 active:scale-95 transition transform duration-200 p-3 rounded disabled:opacity-50"
         >
           Submit
         </button>
 
-        {result === "correct" && (
-          <p className="mt-4 text-green-400 text-lg">
-            Correct! 🎉
-          </p>
-        )}
-
-        {result === "wrong" && (
-          <p className="mt-4 text-red-400 text-lg">
-            Wrong answer ❌
+        {result && (
+          <p
+            className={`mt-4 text-lg font-semibold transition-all duration-500 ${
+              result === "correct"
+                ? "text-green-400 scale-110"
+                : "text-red-400 shake"
+            }`}
+          >
+            {result === "correct"
+              ? "Correct! 🎉"
+              : "Wrong answer ❌"}
           </p>
         )}
 
         <Link to="/leaderboard">
-          <button className="mt-6 w-full bg-purple-600 hover:bg-purple-700 p-3 rounded transition">
+          <button className="mt-6 w-full bg-purple-600 hover:bg-purple-700 hover:scale-105 transition transform duration-200 p-3 rounded">
             View Leaderboard 🏆
           </button>
         </Link>
