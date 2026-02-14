@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import dayjs from "dayjs";
+import { motion as Motion } from "framer-motion";
 import { getDailySeed } from "../utils/seed";
 import { generateDailyPuzzle } from "../puzzles";
 import { saveData, getData } from "../services/indexedDB";
-
 import { auth, provider } from "../services/firebase";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 
@@ -47,7 +47,7 @@ function Home() {
   };
 
   // ---------------- STREAK CALC ----------------
-  function calculateStreak(history) {
+  const calculateStreak = (history) => {
     let count = 0;
     let day = dayjs();
 
@@ -55,13 +55,12 @@ function Home() {
       count++;
       day = day.subtract(1, "day");
     }
-
     return count;
-  }
+  };
 
   // ---------------- LOAD GAME DATA ----------------
   useEffect(() => {
-    async function loadGameData() {
+    const loadGameData = async () => {
       const lastPlayedDate = await getData("lastPlayedDate");
       const storedScore = await getData("score");
       const storedHistory = (await getData("completionHistory")) || {};
@@ -80,11 +79,11 @@ function Home() {
         await saveData("lastPlayedDate", today);
       }
 
-      if (storedScore !== undefined) setScore(storedScore);
+      if (storedScore !== undefined && storedScore !== null)
+        setScore(storedScore);
 
       const updatedStreak = calculateStreak(storedHistory);
       setStreak(updatedStreak);
-      await saveData("streak", updatedStreak);
 
       if (storedCompleted && lastPlayedDate === today) {
         setCompleted(true);
@@ -95,10 +94,10 @@ function Home() {
         setHintUsed(true);
         setShowHint(true);
       }
-    }
+    };
 
     loadGameData();
-  }, [seed]);
+  }, [seed, today]);
 
   // ---------------- TIMER ----------------
   useEffect(() => {
@@ -143,7 +142,7 @@ function Home() {
 
   // ---------------- SUBMIT ----------------
   const handleSubmit = async () => {
-    if (!user || completed) return;
+    if (!user || completed || !puzzle.answer) return;
 
     const isCorrect =
       puzzle.type === "binary"
@@ -171,13 +170,13 @@ function Home() {
     );
 
     const newScore = score + pointsEarned;
-
     setScore(newScore);
+
     await saveData("score", newScore);
     await saveData("completed-" + seed, true);
     await saveData("lastPlayedDate", today);
 
-    const history = (await getData("completionHistory")) || {};
+    const history = { ...completionHistory };
     history[today] = true;
 
     await saveData("completionHistory", history);
@@ -188,16 +187,19 @@ function Home() {
     await saveData("streak", updatedStreak);
 
     try {
-      await fetch("https://logic-looper-backend.onrender.com/submit-score", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: user.email,
-          score: newScore,
-          timeTaken: time,
-          date: today,
-        }),
-      });
+      await fetch(
+        "https://logic-looper-backend.onrender.com/submit-score",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: user.email,
+            score: newScore,
+            timeTaken: time,
+            date: today,
+          }),
+        }
+      );
     } catch (error) {
       console.error("Backend error:", error);
     }
@@ -206,18 +208,14 @@ function Home() {
   // ---------------- UI ----------------
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center px-4">
-  <div className="w-full max-w-md bg-gray-850 backdrop-blur-md rounded-2xl shadow-2xl p-6 text-center text-white animate-fadeIn">
+      <div className="w-full max-w-md bg-gray-900 rounded-2xl shadow-2xl p-6 text-center text-white">
 
-
-        <h1 className="text-3xl sm:text-4xl font-bold mb-3 tracking-wide">
-  Logic Looper
-</h1>
-
+        <h1 className="text-3xl font-bold mb-4">Logic Looper</h1>
 
         {!user ? (
           <button
             onClick={handleLogin}
-            className="mb-4 w-full bg-red-600 hover:bg-red-700 hover:scale-105 transition transform duration-200 p-3 rounded"
+            className="mb-4 w-full bg-red-600 hover:bg-red-700 p-3 rounded"
           >
             Sign in with Google
           </button>
@@ -228,88 +226,54 @@ function Home() {
             </p>
             <button
               onClick={handleLogout}
-              className="mb-4 w-full bg-gray-700 hover:bg-gray-800 p-2 rounded"
+              className="mb-4 w-full bg-gray-700 p-2 rounded"
             >
               Logout
             </button>
           </>
         )}
 
-        <div className="grid grid-cols-2 gap-3 mb-4 text-sm sm:text-base">
-  <div className="bg-gray-800 p-3 rounded-xl">
-    🔥 Streak
-    <div className="text-orange-400 font-bold">{streak}</div>
-  </div>
+        <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+          <div className="bg-gray-800 p-3 rounded-xl">
+            🔥 Streak
+            <div className="text-orange-400 font-bold">{streak}</div>
+          </div>
+          <div className="bg-gray-800 p-3 rounded-xl">
+            ⭐ Score
+            <div className="text-green-400 font-bold">{score}</div>
+          </div>
+          <div className="bg-gray-800 p-3 rounded-xl">
+            ⏱ Time
+            <div className="text-blue-400 font-bold">{time}s</div>
+          </div>
+          <div className="bg-gray-800 p-3 rounded-xl">
+            🧩 Type
+            <div className="capitalize">{puzzle.type}</div>
+          </div>
+        </div>
 
-  <div className="bg-gray-800 p-3 rounded-xl">
-    ⭐ Score
-    <div className="text-green-400 font-bold">{score}</div>
-  </div>
+        <Motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mb-6 text-xl font-semibold space-y-2"
+        >
+          {Array.isArray(puzzle.question) &&
+            puzzle.question.map((line, index) => (
+              <div key={index}>{line}</div>
+            ))}
+          <div>?</div>
+        </Motion.div>
 
-  <div className="bg-gray-800 p-3 rounded-xl">
-    ⏱ Time
-    <div className="text-blue-400 font-bold">{time}s</div>
-  </div>
-
-  <div className="bg-gray-800 p-3 rounded-xl">
-    🧩 Type
-    <div className="text-gray-300 font-bold capitalize">{puzzle.type}</div>
-  </div>
-</div>
-
-
-        {/* HEATMAP */}
-        {/* ADVANCED HEATMAP */}
-<div className="grid grid-cols-7 gap-1 justify-center mb-4">
-  {Array.from({ length: 21 }).map((_, index) => {
-    const date = dayjs().subtract(20 - index, "day").format("YYYY-MM-DD");
-    const solved = completionHistory[date];
-
-    let color = "bg-gray-700";
-
-    if (solved) {
-      const intensity =
-        score > 200 ? "bg-green-500" :
-        score > 100 ? "bg-green-400" :
-        "bg-green-300";
-
-      color = intensity;
-    }
-
-    return (
-      <div
-        key={date}
-        title={date}
-        className={`w-4 h-4 rounded ${color} transition hover:scale-125`}
-      />
-    );
-  })}
-</div>
-
-
-
-        <div className="mb-6 text-2xl sm:text-3xl font-bold bg-gray-800 p-6 rounded-2xl shadow-inner">
-  {Array.isArray(puzzle.question) &&
-    puzzle.question.map((line, index) => (
-      <div key={index}>{line}</div>
-    ))}
-  <div className="mt-2 text-gray-400">?</div>
-</div>
-
-
-        {/* HINT */}
         <button
           onClick={handleHint}
           disabled={hintUsed}
-          className="w-full bg-yellow-500 hover:bg-yellow-600 hover:scale-105 transition transform duration-200 p-2 rounded mb-3 disabled:opacity-50"
+          className="w-full bg-yellow-500 p-2 rounded mb-3 disabled:opacity-50"
         >
           {hintUsed ? "Hint Used" : "Get Hint"}
         </button>
 
         {showHint && (
-          <p className="text-yellow-400 mb-3 animate-fadeIn">
-            {getHint()}
-          </p>
+          <p className="text-yellow-400 mb-3">{getHint()}</p>
         )}
 
         <input
@@ -317,26 +281,24 @@ function Home() {
           value={userAnswer}
           disabled={!user || completed}
           onChange={(e) => setUserAnswer(e.target.value)}
-          className="w-full p-3 rounded-xl text-black mb-4 focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
+          className="w-full p-3 rounded text-black mb-4"
           placeholder="Enter your answer"
         />
 
         <button
           onClick={handleSubmit}
           disabled={!user || completed}
-          className="w-full bg-blue-600 hover:bg-blue-700 hover:scale-105 active:scale-95 transition transform duration-200 p-3 rounded disabled:opacity-50"
+          className="w-full bg-blue-600 p-3 rounded"
         >
           Submit
         </button>
 
         {result && (
-          <p
-            className={`mt-4 text-lg font-semibold transition-all duration-500 ${
-              result === "correct"
-                ? "text-green-400 scale-110"
-                : "text-red-400 shake"
-            }`}
-          >
+          <p className={`mt-4 text-lg font-semibold ${
+            result === "correct"
+              ? "text-green-400"
+              : "text-red-400"
+          }`}>
             {result === "correct"
               ? "Correct! 🎉"
               : "Wrong answer ❌"}
@@ -344,11 +306,10 @@ function Home() {
         )}
 
         <Link to="/leaderboard">
-          <button className="mt-6 w-full bg-purple-600 hover:bg-purple-700 hover:scale-105 transition transform duration-200 p-3 rounded">
+          <button className="mt-6 w-full bg-purple-600 p-3 rounded">
             View Leaderboard 🏆
           </button>
         </Link>
-
       </div>
     </div>
   );
