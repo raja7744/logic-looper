@@ -20,9 +20,9 @@ function Home() {
   const [result, setResult] = useState(null);
   const [userAnswer, setUserAnswer] = useState("");
   const [time, setTime] = useState(0);
-  const [completionHistory, setCompletionHistory] = useState({});
   const [hintUsed, setHintUsed] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const [_completionHistory, setCompletionHistory] = useState({});
 
   const puzzle = generateDailyPuzzle(seed, streak) || {};
 
@@ -79,7 +79,7 @@ function Home() {
         await saveData("lastPlayedDate", today);
       }
 
-      if (storedScore !== undefined && storedScore !== null)
+      if (storedScore != null)
         setScore(storedScore);
 
       const updatedStreak = calculateStreak(storedHistory);
@@ -142,68 +142,71 @@ function Home() {
 
   // ---------------- SUBMIT ----------------
   const handleSubmit = async () => {
-    if (!user || completed || !puzzle.answer) return;
+  if (!user || completed || puzzle.answer === undefined) return;
 
-    const isCorrect =
-      puzzle.type === "binary"
-        ? userAnswer.trim() === String(puzzle.answer)
-        : Number(userAnswer) === Number(puzzle.answer);
+  const isCorrect =
+    puzzle.type === "binary"
+      ? userAnswer.trim() === String(puzzle.answer)
+      : Number(userAnswer) === Number(puzzle.answer);
 
-    if (!isCorrect) {
-      setResult("wrong");
-      return;
-    }
+  if (!isCorrect) {
+    setResult("wrong");
+    return;
+  }
 
-    setResult("correct");
-    setCompleted(true);
+  setResult("correct");
+  setCompleted(true);
 
-    const difficultyMultiplier =
-      puzzle.difficulty === "easy"
-        ? 1
-        : puzzle.difficulty === "medium"
-        ? 1.5
-        : 2;
+  const difficultyMultiplier =
+    puzzle.difficulty === "easy"
+      ? 1
+      : puzzle.difficulty === "medium"
+      ? 1.5
+      : 2;
 
-    const pointsEarned = Math.max(
-      Math.floor((100 - time) * difficultyMultiplier),
-      10
-    );
+  const basePoints = Math.max(
+    Math.floor((100 - time) * difficultyMultiplier),
+    10
+  );
 
-    const newScore = score + pointsEarned;
-    setScore(newScore);
+  const finalPoints = hintUsed
+    ? Math.max(basePoints - 5, 0)
+    : basePoints;
 
-    await saveData("score", newScore);
-    await saveData("completed-" + seed, true);
-    await saveData("lastPlayedDate", today);
+  const newScore = score + finalPoints;
+  setScore(newScore);
 
-    const history = { ...completionHistory };
-    history[today] = true;
+  await saveData("score", newScore);
+  await saveData("completed-" + seed, true);
+  await saveData("lastPlayedDate", today);
 
-    await saveData("completionHistory", history);
-    setCompletionHistory(history);
+  // ✅ Update completion history safely
+  const updatedHistory = (await getData("completionHistory")) || {};
+  updatedHistory[today] = true;
 
-    const updatedStreak = calculateStreak(history);
-    setStreak(updatedStreak);
-    await saveData("streak", updatedStreak);
+  await saveData("completionHistory", updatedHistory);
 
-    try {
-      await fetch(
-        "https://logic-looper-backend.onrender.com/submit-score",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: user.email,
-            score: newScore,
-            timeTaken: time,
-            date: today,
-          }),
-        }
-      );
-    } catch (error) {
-      console.error("Backend error:", error);
-    }
-  };
+  const updatedStreak = calculateStreak(updatedHistory);
+  setStreak(updatedStreak);
+  await saveData("streak", updatedStreak);
+
+  // ✅ Backend submit
+  try {
+    await fetch("https://logic-looper-backend.onrender.com/submit-score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: user.email,
+        score: finalPoints, // IMPORTANT: send only today's points
+        timeTaken: time,
+        date: today,
+      }),
+    });
+  } catch (error) {
+    console.error("Backend error:", error);
+  }
+};
+
 
   // ---------------- UI ----------------
   return (
