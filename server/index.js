@@ -29,49 +29,29 @@ app.post("/submit-score", async (req, res) => {
   try {
     const { email, score, timeTaken, date } = req.body;
 
-    // Find user
-    let user = await prisma.user.findUnique({
-      where: { email }
-    });
-
-    // If not exists → create
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email,
-          score: 0
-        }
-      });
-    }
-
-    // 🔥 Create Result entry
-    await prisma.result.create({
-      data: {
-        userId: user.id,
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {
+        score: {
+          increment: score,   // 🔥 increment instead of replace
+        },
+        timeTaken,
+        date,
+      },
+      create: {
+        email,
         score,
         timeTaken,
-        date
-      }
+        date,
+      },
     });
 
-    // 🔥 Increment total score
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        score: {
-          increment: score
-        }
-      }
-    });
-
-    res.json({ success: true });
-
+    res.json({ success: true, user });
   } catch (error) {
     console.error("Submit error:", error);
     res.status(500).json({ error: "Failed to submit score" });
   }
 });
-
 
 
 
