@@ -27,21 +27,33 @@ app.get("/", (req, res) => {
 
 app.post("/submit-score", async (req, res) => {
   try {
-    const { email, score } = req.body;
+    const { email, score, timeTaken, date } = req.body;
 
     const user = await prisma.user.upsert({
       where: { email },
-      update: { score },
-      create: { email, score }
+      update: {
+        score: {
+          increment: score,   // 🔥 increment instead of replace
+        },
+        timeTaken,
+        date,
+      },
+      create: {
+        email,
+        score,
+        timeTaken,
+        date,
+      },
     });
 
     res.json({ success: true, user });
-
   } catch (error) {
     console.error("Submit error:", error);
     res.status(500).json({ error: "Failed to submit score" });
   }
 });
+
+
 
 app.get("/leaderboard", async (req, res) => {
   try {
