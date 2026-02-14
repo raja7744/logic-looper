@@ -259,16 +259,33 @@ function Home() {
 
 
         {/* HEATMAP */}
-        <div className="grid grid-cols-7 gap-1 justify-center mb-6">
-  {Object.keys(completionHistory)
-    .slice(-21)
-    .map((date) => (
+        {/* ADVANCED HEATMAP */}
+<div className="grid grid-cols-7 gap-1 justify-center mb-4">
+  {Array.from({ length: 21 }).map((_, index) => {
+    const date = dayjs().subtract(20 - index, "day").format("YYYY-MM-DD");
+    const solved = completionHistory[date];
+
+    let color = "bg-gray-700";
+
+    if (solved) {
+      const intensity =
+        score > 200 ? "bg-green-500" :
+        score > 100 ? "bg-green-400" :
+        "bg-green-300";
+
+      color = intensity;
+    }
+
+    return (
       <div
         key={date}
-        className="w-4 h-4 rounded-sm bg-green-500 hover:scale-110 transition"
+        title={date}
+        className={`w-4 h-4 rounded ${color} transition hover:scale-125`}
       />
-    ))}
+    );
+  })}
 </div>
+
 
 
         <div className="mb-6 text-2xl sm:text-3xl font-bold bg-gray-800 p-6 rounded-2xl shadow-inner">

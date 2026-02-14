@@ -29,12 +29,14 @@ app.post("/submit-score", async (req, res) => {
   try {
     const { email, score, timeTaken, date } = req.body;
 
-    // Find user
+    if (!email || score == null || !date) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
     let user = await prisma.user.findUnique({
       where: { email }
     });
 
-    // If not exists → create
     if (!user) {
       user = await prisma.user.create({
         data: {
@@ -44,22 +46,20 @@ app.post("/submit-score", async (req, res) => {
       });
     }
 
-    // 🔥 Create Result entry
     await prisma.result.create({
       data: {
         userId: user.id,
-        score,
-        timeTaken,
+        score: Number(score),
+        timeTaken: Number(timeTaken),
         date
       }
     });
 
-    // 🔥 Increment total score
     await prisma.user.update({
       where: { id: user.id },
       data: {
         score: {
-          increment: score
+          increment: Number(score)
         }
       }
     });
@@ -71,8 +71,6 @@ app.post("/submit-score", async (req, res) => {
     res.status(500).json({ error: "Failed to submit score" });
   }
 });
-
-
 
 
 app.get("/leaderboard", async (req, res) => {
